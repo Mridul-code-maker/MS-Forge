@@ -24,14 +24,29 @@ export default function LandingPage() {
 
   useEffect(() => {
     initialize();
-  }, [initialize]);
-
-  const toggleTheme = () => {
-    setDarkMode(!darkMode);
-    if (!darkMode) {
+    
+    // Check saved theme preference on mount
+    const savedTheme = window.localStorage.getItem('ms_forge_theme');
+    const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (savedTheme === 'dark' || (!savedTheme && systemPrefersDark)) {
+      setDarkMode(true);
       document.documentElement.classList.add('dark');
     } else {
+      setDarkMode(false);
       document.documentElement.classList.remove('dark');
+    }
+  }, [initialize]);
+
+  // Handle Dark Mode toggle
+  const toggleTheme = () => {
+    const nextDark = !darkMode;
+    setDarkMode(nextDark);
+    if (nextDark) {
+      document.documentElement.classList.add('dark');
+      window.localStorage.setItem('ms_forge_theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      window.localStorage.setItem('ms_forge_theme', 'light');
     }
   };
 

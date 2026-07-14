@@ -6,7 +6,7 @@ import Link from 'next/link';
 import api from '../../lib/api';
 import { useAuthStore } from '../../store/authStore';
 import { useTaskStore } from '../../store/taskStore';
-import { ArrowLeft, UserPlus, Users, ListTodo, Shield, CreditCard, RefreshCw, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, UserPlus, Users, ListTodo, Shield, CreditCard, RefreshCw, AlertTriangle, CheckCircle2, Sun, Moon } from 'lucide-react';
 
 interface Member {
   id: string;
@@ -32,6 +32,33 @@ export default function AdminPage() {
   const router = useRouter();
   const { user } = useAuthStore();
   const { metrics, fetchMetrics } = useTaskStore();
+
+  const [darkMode, setDarkMode] = useState(false);
+
+  // Sync theme on mount
+  useEffect(() => {
+    const savedTheme = window.localStorage.getItem('ms_forge_theme');
+    const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (savedTheme === 'dark' || (!savedTheme && systemPrefersDark)) {
+      setDarkMode(true);
+      document.documentElement.classList.add('dark');
+    } else {
+      setDarkMode(false);
+      document.documentElement.classList.remove('dark');
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    const nextDark = !darkMode;
+    setDarkMode(nextDark);
+    if (nextDark) {
+      document.documentElement.classList.add('dark');
+      window.localStorage.setItem('ms_forge_theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      window.localStorage.setItem('ms_forge_theme', 'light');
+    }
+  };
 
   const [members, setMembers] = useState<Member[]>([]);
   const [logs, setLogs] = useState<AuditLog[]>([]);
@@ -160,13 +187,23 @@ export default function AdminPage() {
               <Shield size={12} /> Admin Console
             </span>
           </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400 font-semibold">
+          <div className="flex items-center gap-4">
+            <span className="text-xs text-slate-400 font-semibold hidden md:inline">
               Admin: <span className="text-slate-600 dark:text-slate-200">{user.name}</span>
             </span>
-          </div>
-        </div>
+
+            {/* Theme Toggle */}
+            <button 
+              onClick={toggleTheme} 
+              className={`p-2 rounded-lg border transition-all ${
+                darkMode ? 'border-slate-800 hover:bg-slate-900 text-amber-400' : 'border-slate-200 hover:bg-slate-100 text-slate-500'
+              }`}
+              title="Toggle Theme"
+              aria-label="Toggle Theme"
+            >
+              {darkMode ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
+          </div>        </div>
       </header>
 
       <main className="mx-auto max-w-7xl px-6 py-8 space-y-8">

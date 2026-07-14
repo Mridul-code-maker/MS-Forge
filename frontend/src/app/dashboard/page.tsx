@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuthStore } from '../../store/authStore';
 import { useTaskStore, Task } from '../../store/taskStore';
-import { Plus, LogOut, Shield, Search, Filter, ArrowUpDown, RefreshCw, Trash2, Edit3, CheckCircle2 } from 'lucide-react';
+import { Plus, LogOut, Shield, Search, Filter, ArrowUpDown, RefreshCw, Trash2, Edit3, CheckCircle2, Sun, Moon } from 'lucide-react';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -17,6 +17,32 @@ export default function DashboardPage() {
   const [priorityFilter, setPriorityFilter] = useState('');
   const [sortBy, setSortBy] = useState('createdAt');
   const [order, setOrder] = useState('desc');
+  const [darkMode, setDarkMode] = useState(false);
+
+  // Sync theme on mount
+  useEffect(() => {
+    const savedTheme = window.localStorage.getItem('ms_forge_theme');
+    const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (savedTheme === 'dark' || (!savedTheme && systemPrefersDark)) {
+      setDarkMode(true);
+      document.documentElement.classList.add('dark');
+    } else {
+      setDarkMode(false);
+      document.documentElement.classList.remove('dark');
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    const nextDark = !darkMode;
+    setDarkMode(nextDark);
+    if (nextDark) {
+      document.documentElement.classList.add('dark');
+      window.localStorage.setItem('ms_forge_theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      window.localStorage.setItem('ms_forge_theme', 'light');
+    }
+  };
 
   // Task Modal Form State
   const [showModal, setShowModal] = useState(false);
@@ -123,7 +149,6 @@ export default function DashboardPage() {
               SaaS Board
             </span>
           </div>
-
           <div className="flex items-center gap-4">
             <span className="text-xs text-slate-400 font-semibold hidden md:inline">
               User: <span className="text-slate-600 dark:text-slate-200">{user.name}</span>
@@ -139,6 +164,18 @@ export default function DashboardPage() {
               </Link>
             )}
 
+            {/* Theme Toggle */}
+            <button 
+              onClick={toggleTheme} 
+              className={`p-2 rounded-lg border transition-all ${
+                darkMode ? 'border-slate-800 hover:bg-slate-900 text-amber-400' : 'border-slate-200 hover:bg-slate-100 text-slate-500'
+              }`}
+              title="Toggle Theme"
+              aria-label="Toggle Theme"
+            >
+              {darkMode ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
+
             <button 
               onClick={() => { logout(); router.push('/'); }} 
               className="p-2 rounded-lg border border-slate-200 dark:border-slate-850 hover:bg-red-50 dark:hover:bg-red-950/20 text-slate-500 hover:text-red-500 dark:hover:text-red-400 transition-colors"
@@ -146,8 +183,7 @@ export default function DashboardPage() {
             >
               <LogOut size={16} />
             </button>
-          </div>
-        </div>
+          </div>        </div>
       </header>
 
       <main className="mx-auto max-w-7xl px-6 py-8">
