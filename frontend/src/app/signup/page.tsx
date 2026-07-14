@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '../../store/authStore';
@@ -8,13 +8,23 @@ import { ShieldAlert } from 'lucide-react';
 
 export default function SignupPage() {
   const router = useRouter();
-  const { signup, loading, error } = useAuthStore();
+  const { signup, loading, error, initialize, user } = useAuthStore();
 
   const [orgName, setOrgName] = useState('');
   const [slug, setSlug] = useState('');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+
+  useEffect(() => {
+    initialize();
+  }, [initialize]);
+
+  useEffect(() => {
+    if (user) {
+      router.replace('/dashboard');
+    }
+  }, [user, router]);
 
   // Auto-generate URL slug based on organization name input
   const handleOrgNameChange = (val: string) => {
