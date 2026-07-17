@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import api from '../lib/api';
+import api, { API_BASE } from '../lib/api';
 import { io, Socket } from 'socket.io-client';
 
 export interface Task {
@@ -119,7 +119,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     if (existingSocket) return;
 
     // Establish WebSocket connection
-    const socket = io('http://localhost:5000');
+    const socket = io(API_BASE);
     
     socket.emit('join_tenant', tenantId);
 

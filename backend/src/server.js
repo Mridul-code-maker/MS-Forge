@@ -63,25 +63,6 @@ app.get('/api/v1/keep-alive', (req, res) => {
   });
 });
 
-// Debug endpoint to check seeded users
-app.get('/api/v1/debug-users', async (req, res) => {
-  try {
-    const users = await prisma.user.findMany({
-      select: {
-        name: true,
-        email: true,
-        role: true
-      }
-    });
-    res.json({
-      count: users.length,
-      users: users
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).send('OK');

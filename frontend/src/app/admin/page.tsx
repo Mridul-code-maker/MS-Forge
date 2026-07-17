@@ -77,17 +77,10 @@ export default function AdminPage() {
   const [plan, setPlan] = useState('Free Tier');
   const [isCheckingOut, setIsCheckingOut] = useState(false);
 
-  // Auth RBAC restriction guard
+  // Redirect to dashboard (Admin tools are now integrated as tabs)
   useEffect(() => {
-    const token = window.localStorage.getItem('ms_forge_access_token');
-    if (!token) {
-      router.replace('/login');
-      return;
-    }
-    if (user && user.role !== 'Admin') {
-      router.replace('/dashboard');
-    }
-  }, [user, router]);
+    router.replace('/dashboard');
+  }, [router]);
 
   const loadAdminData = async () => {
     setLoading(true);
