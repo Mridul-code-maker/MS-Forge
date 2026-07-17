@@ -89,6 +89,151 @@ export default function DashboardPage() {
 
   const [darkMode, setDarkMode] = useState(false);
 
+  // Heatmap & Command Palette States
+  const [heatmapData, setHeatmapData] = useState<Record<string, number>>({});
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
+  const [commandQuery, setCommandQuery] = useState('');
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
+
+  const fetchHeatmapData = async () => {
+    try {
+      const res = await api.get('/api/v1/tenants/heatmap');
+      setHeatmapData(res.data.data || {});
+    } catch (err) {
+      console.error('Failed to fetch heatmap data:', err);
+    }
+  };
+
+  // CSV Task Exporter
+  const exportTasksCSV = () => {
+    const headers = ['ID', 'Title', 'Description', 'Status', 'Priority', 'Due Date', 'Created At'];
+    const rows = tasks.map(t => [
+      t.id,
+      `"${t.title.replace(/"/g, '""')}"`,
+      `"${t.description.replace(/"/g, '""')}"`,
+      t.status,
+      t.priority,
+      t.dueDate,
+      t.createdAt || ''
+    ]);
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `workspace_tasks_${tenant?.slug || 'export'}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // CSV Audit Logs Exporter
+  const exportLogsCSV = () => {
+    if (user?.role !== 'Admin') return;
+    const headers = ['ID', 'User Email', 'User Name', 'Action', 'Details', 'Timestamp'];
+    const rows = logs.map(l => [
+      l.id,
+      l.user.email,
+      `"${l.user.name.replace(/"/g, '""')}"`,
+      l.action,
+      `"${l.details.replace(/"/g, '""')}"`,
+      l.createdAt
+    ]);
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `security_logs_${tenant?.slug || 'export'}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // PDF Print Exporter
+  const exportWorkspacePDF = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    
+    const tasksHTML = tasks.map(t => `
+      <tr style="border-bottom: 1px solid #e2e8f0;">
+        <td style="padding: 8px; font-weight: bold;">${t.title}</td>
+        <td style="padding: 8px;">${t.description}</td>
+        <td style="padding: 8px;"><span style="padding: 2px 6px; border-radius: 4px; font-size: 10px; background-color: #f1f5f9;">${t.status}</span></td>
+        <td style="padding: 8px;">${t.priority}</td>
+        <td style="padding: 8px;">${new Date(t.dueDate).toLocaleDateString()}</td>
+      </tr>
+    `).join('');
+
+    const logsHTML = logs.map(l => `
+      <tr style="border-bottom: 1px solid #e2e8f0; font-size: 11px;">
+        <td style="padding: 6px;">${new Date(l.createdAt).toLocaleString()}</td>
+        <td style="padding: 6px; font-weight: bold;">${l.user.name}</td>
+        <td style="padding: 6px; color: #0d9488;">${l.action}</td>
+        <td style="padding: 6px;">${l.details}</td>
+      </tr>
+    `).join('');
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Workspace Audit Report - ${tenant?.name || 'MS-Forge'}</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #1e293b; padding: 40px; }
+            h1 { font-size: 24px; font-weight: 800; margin-bottom: 5px; color: #0f766e; }
+            h2 { font-size: 16px; font-weight: 700; border-bottom: 2px solid #0d9488; padding-bottom: 6px; margin-top: 30px; }
+            table { width: 100%; border-collapse: collapse; text-align: left; font-size: 12px; margin-top: 10px; }
+            th { background-color: #f0fdfa; padding: 8px; font-weight: bold; border-bottom: 1px solid #cbd5e1; }
+          </style>
+        </head>
+        <body>
+          <h1>Workspace Audit Report</h1>
+          <p style="font-size: 12px; color: #64748b; margin-top: 0;">Generated on: ${new Date().toLocaleString()} | Tenant: ${tenant?.name || 'N/A'}</p>
+          
+          <h2>Workspace Tasks List</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Title</th>
+                <th>Description</th>
+                <th>Status</th>
+                <th>Priority</th>
+                <th>Due Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${tasksHTML || '<tr><td colspan="5" style="text-align:center; padding:20px; color:#94a3b8;">No tasks found.</td></tr>'}
+            </tbody>
+          </table>
+
+          ${user?.role === 'Admin' ? `
+          <h2>Workspace Security Logs</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>Performed By</th>
+                <th>Action</th>
+                <th>Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${logsHTML || '<tr><td colspan="4" style="text-align:center; padding:20px; color:#94a3b8;">No audit logs available.</td></tr>'}
+            </tbody>
+          </table>
+          ` : ''}
+
+          <script>
+            window.onload = function() {
+              window.print();
+            }
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   // Sync theme preference on mount
   useEffect(() => {
     const savedTheme = window.localStorage.getItem('ms_forge_theme');
@@ -153,6 +298,7 @@ export default function DashboardPage() {
       setupWebSockets(user.tenantId);
       fetchTasks();
       fetchMetrics();
+      fetchHeatmapData();
     }
     return () => {
       cleanupWebSockets();
@@ -177,12 +323,15 @@ export default function DashboardPage() {
 
       activeSocket.on('task_created', (newTask: Task) => {
         handleTaskNotification(`New task created: "${newTask.title}"`);
+        fetchHeatmapData();
       });
       activeSocket.on('task_updated', (updatedTask: Task) => {
         handleTaskNotification(`Task status updated to ${updatedTask.status}: "${updatedTask.title}"`);
+        fetchHeatmapData();
       });
       activeSocket.on('task_deleted', ({ title }: { id: string, title?: string }) => {
         handleTaskNotification(`Task was deleted: "${title || 'Untitled task'}"`);
+        fetchHeatmapData();
       });
 
       return () => {
@@ -205,6 +354,84 @@ export default function DashboardPage() {
       });
     }
   }, [search, statusFilter, priorityFilter, sortBy, order, user, fetchTasks]);
+
+  // Command Palette Items Definition
+  interface CommandItem {
+    id: string;
+    category: 'Navigation' | 'Actions' | 'Tasks';
+    title: string;
+    subtitle?: string;
+    action: () => void;
+  }
+
+  const defaultCommands: CommandItem[] = [
+    { id: 'nav-overview', category: 'Navigation', title: 'Go to Overview Dashboard', action: () => setActiveTab('overview') },
+    { id: 'nav-kanban', category: 'Navigation', title: 'Go to Task Sync Board', action: () => setActiveTab('kanban') },
+    { id: 'nav-roster', category: 'Navigation', title: 'Go to Workspace Roster', action: () => { if (user?.role === 'Admin') setActiveTab('roster'); else alert('Access Restricted to Workspace Administrators.'); } },
+    { id: 'nav-logs', category: 'Navigation', title: 'Go to Security Audit Logs', action: () => { if (user?.role === 'Admin') setActiveTab('logs'); else alert('Access Restricted to Workspace Administrators.'); } },
+    { id: 'nav-billing', category: 'Navigation', title: 'Go to Subscriptions & Billing', action: () => { if (user?.role === 'Admin') setActiveTab('billing'); else alert('Access Restricted to Workspace Administrators.'); } },
+    { id: 'action-create', category: 'Actions', title: 'Create New Workspace Task', action: () => setShowModal(true) },
+    { id: 'action-theme', category: 'Actions', title: 'Toggle Dark / Light Mode', action: () => toggleTheme() },
+    { id: 'action-invite', category: 'Actions', title: 'Invite New Workspace Member', action: () => { if (user?.role === 'Admin') { setActiveTab('roster'); setTimeout(() => { const el = document.getElementById('invite-name'); if (el) el.focus(); }, 100); } else alert('Access Restricted to Workspace Administrators.'); } },
+    { id: 'action-logout', category: 'Actions', title: 'Sign Out of Workspace', action: () => { logout(); router.push('/'); } },
+  ];
+
+  const taskCommands: CommandItem[] = tasks
+    .filter(task => task.title.toLowerCase().includes(commandQuery.toLowerCase()))
+    .slice(0, 5)
+    .map(task => ({
+      id: `task-${task.id}`,
+      category: 'Tasks',
+      title: task.title,
+      subtitle: `Status: ${task.status} | Priority: ${task.priority}`,
+      action: () => {
+        alert(`Task: "${task.title}"\nDescription: ${task.description}\nStatus: ${task.status}\nPriority: ${task.priority}`);
+      }
+    }));
+
+  const filteredCommands = [
+    ...defaultCommands.filter(cmd => cmd.title.toLowerCase().includes(commandQuery.toLowerCase())),
+    ...taskCommands
+  ];
+
+  // Listen for keyboard shortcut Cmd+K or Ctrl+K
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setShowCommandPalette(prev => !prev);
+        setCommandQuery('');
+        setHighlightedIndex(0);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Listen for navigation keys inside the palette
+  useEffect(() => {
+    if (!showCommandPalette) return;
+    const handleKeyboardNav = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setHighlightedIndex(prev => (prev + 1) % filteredCommands.length);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setHighlightedIndex(prev => (prev - 1 + filteredCommands.length) % filteredCommands.length);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (filteredCommands[highlightedIndex]) {
+          filteredCommands[highlightedIndex].action();
+          setShowCommandPalette(false);
+        }
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        setShowCommandPalette(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyboardNav);
+    return () => window.removeEventListener('keydown', handleKeyboardNav);
+  }, [showCommandPalette, highlightedIndex, filteredCommands]);
 
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -293,7 +520,7 @@ export default function DashboardPage() {
   if (authLoading || !user) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
-        <RefreshCw className="animate-spin text-violet-500" size={32} />
+        <RefreshCw className="animate-spin text-teal-500" size={32} />
       </div>
     );
   }
@@ -354,7 +581,7 @@ export default function DashboardPage() {
           <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-850">
             <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Organization</div>
             <div className="font-bold text-sm truncate">{tenant?.name || 'My SaaS Platform'}</div>
-            <span className="inline-block text-[9px] font-black uppercase tracking-wider bg-violet-50 dark:bg-violet-950/30 text-violet-600 dark:text-violet-400 px-2 py-0.5 rounded mt-1.5">
+            <span className="inline-block text-[9px] font-black uppercase tracking-wider bg-teal-50 dark:bg-teal-950/30 text-teal-600 dark:text-teal-400 px-2 py-0.5 rounded mt-1.5">
               {plan}
             </span>
           </div>
@@ -463,6 +690,17 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex items-center gap-3.5">
+            {/* Command Palette Keyboard Badge Hint */}
+            <button
+              onClick={() => { setShowCommandPalette(true); setCommandQuery(''); setHighlightedIndex(0); }}
+              className="hidden sm:inline-flex items-center gap-2 h-9 px-3 rounded-lg border border-slate-200 dark:border-slate-850 hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors text-slate-400 dark:text-slate-500 font-medium text-[10px]"
+              title="Search commands or tasks (Cmd+K)"
+            >
+              <span>Search commands...</span>
+              <kbd className="h-5 min-w-[30px] inline-flex items-center justify-center rounded border border-slate-250 dark:border-slate-800 bg-slate-100 dark:bg-slate-950 font-sans text-[9px] font-black tracking-wide text-slate-500 uppercase">
+                ⌘K
+              </kbd>
+            </button>
             {/* Real-time Notifications Bell */}
             <div className="relative">
               <button 
@@ -474,7 +712,7 @@ export default function DashboardPage() {
               >
                 <Bell size={15} />
                 {notifications.some(n => n.unread) && (
-                  <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-violet-600 animate-pulse" />
+                  <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-teal-600 animate-pulse" />
                 )}
               </button>
 
@@ -488,7 +726,7 @@ export default function DashboardPage() {
                         onClick={() => {
                           setNotifications(prev => prev.map(n => ({ ...n, unread: false })));
                         }}
-                        className="text-[10px] text-violet-600 dark:text-violet-400 hover:underline font-bold"
+                        className="text-[10px] text-teal-600 dark:text-teal-400 hover:underline font-bold"
                       >
                         Clear Indicators
                       </button>
@@ -502,7 +740,7 @@ export default function DashboardPage() {
                       ) : (
                         notifications.map(n => (
                           <div key={n.id} className="flex gap-2.5 items-start text-xs border-b border-slate-50 dark:border-slate-850/50 pb-2">
-                            <span className="h-1.5 w-1.5 rounded-full bg-violet-500 shrink-0 mt-1.5" />
+                            <span className="h-1.5 w-1.5 rounded-full bg-teal-500 shrink-0 mt-1.5" />
                             <div className="space-y-0.5 text-left">
                               <p className="text-slate-700 dark:text-slate-300 font-medium">{n.text}</p>
                               <span className="text-[9px] text-slate-400 font-bold block">{n.time}</span>
@@ -543,7 +781,7 @@ export default function DashboardPage() {
                     <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Active Roster</span>
                     <span className="text-2xl font-bold">{members.length || 10}</span>
                   </div>
-                  <div className="h-11 w-11 rounded-lg bg-violet-50 dark:bg-violet-950/20 text-violet-500 flex items-center justify-center">
+                  <div className="h-11 w-11 rounded-lg bg-teal-50 dark:bg-teal-950/20 text-teal-500 flex items-center justify-center">
                     <Users size={22} />
                   </div>
                 </div>
@@ -553,7 +791,7 @@ export default function DashboardPage() {
                     <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Total Tasks</span>
                     <span className="text-2xl font-bold">{totalTasksCount}</span>
                   </div>
-                  <div className="h-11 w-11 rounded-lg bg-indigo-50 dark:bg-indigo-950/20 text-indigo-500 flex items-center justify-center">
+                  <div className="h-11 w-11 rounded-lg bg-cyan-50 dark:bg-cyan-950/20 text-cyan-500 flex items-center justify-center">
                     <CircleDot size={22} />
                   </div>
                 </div>
@@ -571,7 +809,7 @@ export default function DashboardPage() {
                 <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
                   <div>
                     <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Current Plan</span>
-                    <span className="text-sm font-bold text-violet-600 dark:text-violet-400 truncate">{plan}</span>
+                    <span className="text-sm font-bold text-teal-600 dark:text-teal-400 truncate">{plan}</span>
                   </div>
                   <div className="h-11 w-11 rounded-lg bg-sky-50 dark:bg-sky-950/20 text-sky-500 flex items-center justify-center">
                     <CreditCard size={22} />
@@ -600,8 +838,8 @@ export default function DashboardPage() {
                       {/* Created line fill gradient */}
                       <defs>
                         <linearGradient id="createdGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.15" />
-                          <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0.0" />
+                          <stop offset="0%" stopColor="#0d9488" stopOpacity="0.15" />
+                          <stop offset="100%" stopColor="#0d9488" stopOpacity="0.0" />
                         </linearGradient>
                         <linearGradient id="completedGrad" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="0%" stopColor="#10b981" stopOpacity="0.15" />
@@ -615,14 +853,14 @@ export default function DashboardPage() {
                         fill="url(#createdGrad)"
                       />
                       <path 
-                        d={`M 40,160 L 40,${160 - (trends[0].completed / 30) * 130} L 128,${160 - (trends[1].completed / 30) * 130} L 216,${160 - (trends[2].completed / 30) * 130} L 304,${160 - (trends[3].completed / 30) * 130} L 392,${160 - (trends[4].completed / 30) * 130} L 480,${160 - (trends[5].completed / 30) * 130} L 480,160 Z`}
+                        d={`M 40,160 L 40,${160 - (trends[0].completed / 30) * 130} L 128,${160 - (trends[1].completed / 30) * 130} L 216,${160 - (trends[2].created / 30) * 130} L 304,${160 - (trends[3].completed / 30) * 130} L 392,${160 - (trends[4].completed / 30) * 130} L 480,${160 - (trends[5].completed / 30) * 130} L 480,160 Z`}
                         fill="url(#completedGrad)"
                       />
 
                       {/* Poly lines */}
                       <polyline
                         fill="none"
-                        stroke="#8b5cf6"
+                        stroke="#0d9488"
                         strokeWidth="2.5"
                         strokeLinecap="round"
                         points={`40,${160 - (trends[0].created / 30) * 130} 128,${160 - (trends[1].created / 30) * 130} 216,${160 - (trends[2].created / 30) * 130} 304,${160 - (trends[3].created / 30) * 130} 392,${160 - (trends[4].created / 30) * 130} 480,${160 - (trends[5].created / 30) * 130}`}
@@ -638,7 +876,7 @@ export default function DashboardPage() {
                       {/* Data Dots */}
                       {trends.map((t, i) => (
                         <g key={t.month}>
-                          <circle cx={40 + i * 88} cy={160 - (t.created / 30) * 130} r="3.5" fill="#8b5cf6" stroke="white" strokeWidth="1" className="dark:stroke-slate-900" />
+                          <circle cx={40 + i * 88} cy={160 - (t.created / 30) * 130} r="3.5" fill="#0d9488" stroke="white" strokeWidth="1" className="dark:stroke-slate-900" />
                           <circle cx={40 + i * 88} cy={160 - (t.completed / 30) * 130} r="3.5" fill="#10b981" stroke="white" strokeWidth="1" className="dark:stroke-slate-900" />
                         </g>
                       ))}
@@ -652,7 +890,7 @@ export default function DashboardPage() {
 
                   {/* Chart legends */}
                   <div className="flex gap-4 justify-center text-[10px] font-bold text-slate-500 mt-4">
-                    <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-violet-500" /> Tasks Created</span>
+                    <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-teal-500" /> Tasks Created</span>
                     <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Tasks Completed</span>
                   </div>
                 </div>
@@ -700,7 +938,7 @@ export default function DashboardPage() {
                       <span className="text-slate-400 block text-[9px] uppercase mt-0.5">Done</span>
                     </div>
                     <div>
-                      <span className="text-indigo-500 block text-xs">{inProgressCount}</span>
+                      <span className="text-cyan-500 block text-xs">{inProgressCount}</span>
                       <span className="text-slate-400 block text-[9px] uppercase mt-0.5">Working</span>
                     </div>
                     <div>
@@ -710,6 +948,122 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
+              </div>
+
+              {/* Task Completion Heatmap (GitHub-style calendar grid) */}
+              <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm text-left">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                  <div>
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1">Task Completion Grid</span>
+                    <span className="text-[11px] text-slate-505">Visual mapping of completed workspace tasks over the last 365 days</span>
+                  </div>
+                  
+                  {/* Export Report buttons */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={exportTasksCSV}
+                      className="h-8 px-3 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900/60 text-[10px] font-bold transition-colors"
+                      title="Export tasks as CSV spreadsheet file"
+                    >
+                      Export Tasks CSV
+                    </button>
+                    {user?.role === 'Admin' && (
+                      <>
+                        <button
+                          onClick={exportLogsCSV}
+                          className="h-8 px-3 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900/60 text-[10px] font-bold transition-colors"
+                          title="Export security audit logs"
+                        >
+                          Export Logs CSV
+                        </button>
+                        <button
+                          onClick={exportWorkspacePDF}
+                          className="h-8 px-4 rounded-lg bg-teal-600 text-white hover:bg-teal-700 text-[10px] font-black tracking-wide uppercase transition-colors"
+                          title="Generate printable PDF report summary"
+                        >
+                          Print PDF Report
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* The Heatmap Grid */}
+                <div className="overflow-x-auto pb-2">
+                  <div className="min-w-[620px] flex gap-2">
+                    {/* Days Labels Column */}
+                    <div className="grid grid-rows-7 text-[8px] font-bold text-slate-400 select-none pr-1 mt-6 gap-[7px]">
+                      <span>Mon</span>
+                      <span className="invisible">Tue</span>
+                      <span>Wed</span>
+                      <span className="invisible">Thu</span>
+                      <span>Fri</span>
+                      <span className="invisible">Sat</span>
+                      <span className="invisible">Sun</span>
+                    </div>
+
+                    <div className="flex-1">
+                      {/* Months Header row */}
+                      <div className="flex text-[8px] font-bold text-slate-400 select-none mb-1 justify-between px-2">
+                        <span>Jul</span>
+                        <span>Aug</span>
+                        <span>Sep</span>
+                        <span>Oct</span>
+                        <span>Nov</span>
+                        <span>Dec</span>
+                        <span>Jan</span>
+                        <span>Feb</span>
+                        <span>Mar</span>
+                        <span>Apr</span>
+                        <span>May</span>
+                        <span>Jun</span>
+                        <span>Jul</span>
+                      </div>
+
+                      {/* 53 columns wrapping every 7 cells */}
+                      <div className="grid grid-flow-col grid-rows-7 gap-[3px] auto-cols-max">
+                        {(() => {
+                          const days = [];
+                          const today = new Date();
+                          // Render last 371 days (53 full weeks) to align columns perfectly
+                          for (let i = 370; i >= 0; i--) {
+                            const d = new Date();
+                            d.setDate(today.getDate() - i);
+                            days.push(d);
+                          }
+                          return days.map((day, idx) => {
+                            const dateStr = day.toISOString().split('T')[0];
+                            const count = heatmapData[dateStr] || 0;
+                            let colorClass = 'bg-slate-100 dark:bg-slate-800/60';
+                            if (count === 1) colorClass = 'bg-teal-100 dark:bg-teal-900/20 text-teal-900';
+                            if (count === 2) colorClass = 'bg-teal-300 dark:bg-teal-900/50 text-teal-850';
+                            if (count === 3) colorClass = 'bg-teal-500 dark:bg-teal-700 text-white';
+                            if (count >= 4) colorClass = 'bg-teal-700 dark:bg-teal-500 text-white';
+
+                            return (
+                              <div
+                                key={idx}
+                                className={`h-[10px] w-[10px] rounded-sm transition-colors cursor-pointer hover:ring-1 hover:ring-teal-500/50 ${colorClass}`}
+                                title={`${count} task${count === 1 ? '' : 's'} completed on ${day.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`}
+                              />
+                            );
+                          });
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Heatmap Legend */}
+                  <div className="flex items-center justify-end gap-1.5 text-[9px] text-slate-400 mt-4 pr-2 select-none">
+                    <span>Less</span>
+                    <div className="h-[9px] w-[9px] rounded-sm bg-slate-100 dark:bg-slate-800/60" />
+                    <div className="h-[9px] w-[9px] rounded-sm bg-teal-100 dark:bg-teal-900/20" />
+                    <div className="h-[9px] w-[9px] rounded-sm bg-teal-300 dark:bg-teal-900/50" />
+                    <div className="h-[9px] w-[9px] rounded-sm bg-teal-500 dark:bg-teal-700" />
+                    <div className="h-[9px] w-[9px] rounded-sm bg-teal-700 dark:bg-teal-500" />
+                    <span>More</span>
+                  </div>
+                </div>
               </div>
 
               {/* Recent activity summary panel */}
@@ -724,7 +1078,7 @@ export default function DashboardPage() {
                     notifications.slice(0, 4).map((n) => (
                       <div key={n.id} className="flex justify-between items-center text-xs pb-3 border-b border-slate-100 dark:border-slate-850 last:border-b-0 last:pb-0">
                         <div className="flex gap-3 items-center">
-                          <span className="h-2 w-2 rounded-full bg-violet-600 animate-pulse" />
+                          <span className="h-2 w-2 rounded-full bg-teal-600 animate-pulse" />
                           <span className="font-medium text-slate-700 dark:text-slate-350">{n.text}</span>
                         </div>
                         <span className="text-[10px] text-slate-400 font-bold">{n.time}</span>
@@ -758,7 +1112,7 @@ export default function DashboardPage() {
                       placeholder="Search tasks..."
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
-                      className="h-10 pl-9 pr-4 w-48 sm:w-64 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-violet-500/10 focus:border-violet-500 transition-all"
+                      className="h-10 pl-9 pr-4 w-48 sm:w-64 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-teal-500/10 focus:border-teal-500 transition-all"
                     />
                   </div>
 
@@ -892,7 +1246,7 @@ export default function DashboardPage() {
                 <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-4">Workspace Roster</h2>
                 
                 {loadingAdmin ? (
-                  <div className="py-12 flex justify-center"><RefreshCw className="animate-spin text-violet-500" /></div>
+                  <div className="py-12 flex justify-center"><RefreshCw className="animate-spin text-teal-500" /></div>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse text-xs">
@@ -920,7 +1274,7 @@ export default function DashboardPage() {
                               {member.id !== user.id ? (
                                 <button
                                   onClick={() => handleRoleChange(member.id, member.role)}
-                                  className="text-violet-600 dark:text-violet-400 hover:underline"
+                                  className="text-teal-600 dark:text-teal-400 hover:underline"
                                 >
                                   Toggle Role
                                 </button>
@@ -963,7 +1317,7 @@ export default function DashboardPage() {
                         value={inviteName}
                         onChange={(e) => setInviteName(e.target.value)}
                         placeholder="e.g. John Doe"
-                        className="w-full h-10 px-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-xs focus:outline-none focus:ring-2 focus:ring-violet-500/10 focus:border-violet-500 transition-all"
+                        className="w-full h-10 px-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-xs focus:outline-none focus:ring-2 focus:ring-teal-500/10 focus:border-teal-500 transition-all"
                       />
                     </div>
 
@@ -975,7 +1329,7 @@ export default function DashboardPage() {
                         value={inviteEmail}
                         onChange={(e) => setInviteEmail(e.target.value)}
                         placeholder="e.g. john@msforge.com"
-                        className="w-full h-10 px-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-xs focus:outline-none focus:ring-2 focus:ring-violet-500/10 focus:border-violet-500 transition-all"
+                        className="w-full h-10 px-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-xs focus:outline-none focus:ring-2 focus:ring-teal-500/10 focus:border-teal-500 transition-all"
                       />
                     </div>
 
@@ -1023,7 +1377,7 @@ export default function DashboardPage() {
               <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-4">Workspace Security Audit Logs</h2>
 
               {loadingAdmin ? (
-                <div className="py-12 flex justify-center"><RefreshCw className="animate-spin text-violet-500" /></div>
+                <div className="py-12 flex justify-center"><RefreshCw className="animate-spin text-teal-500" /></div>
               ) : (
                 <div className="space-y-4">
                   {logs.length === 0 ? (
@@ -1050,7 +1404,7 @@ export default function DashboardPage() {
                             </span>
                           </div>
                           <div>
-                            <span className="font-bold text-violet-600 dark:text-violet-400">{log.action}: </span>
+                            <span className="font-bold text-teal-600 dark:text-teal-400">{log.action}: </span>
                             <span className="text-slate-600 dark:text-slate-350">{log.details}</span>
                           </div>
                         </div>
@@ -1074,7 +1428,7 @@ export default function DashboardPage() {
                 <div className="flex flex-col sm:flex-row gap-6 justify-between items-baseline border-b border-slate-150 dark:border-slate-850 pb-6 mb-6">
                   <div>
                     <span className="text-xs text-slate-400 block mb-0.5">Current Active Plan</span>
-                    <span className="text-xl font-black text-violet-600 dark:text-violet-400">{plan}</span>
+                    <span className="text-xl font-black text-teal-600 dark:text-teal-400">{plan}</span>
                   </div>
                   
                   <button
@@ -1102,7 +1456,7 @@ export default function DashboardPage() {
                       <span className="text-slate-700 dark:text-slate-350">{members.length || 10} / {plan === 'Free Tier' ? '10' : 'Unlimited'}</span>
                     </div>
                     <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                      <div className="h-full bg-violet-600 rounded-full" style={{ width: plan === 'Free Tier' ? '100%' : '15%' }} />
+                      <div className="h-full bg-teal-600 rounded-full" style={{ width: plan === 'Free Tier' ? '100%' : '15%' }} />
                     </div>
                   </div>
 
@@ -1112,7 +1466,7 @@ export default function DashboardPage() {
                       <span className="text-slate-700 dark:text-slate-350">{totalTasksCount} / {plan === 'Free Tier' ? '25' : 'Unlimited'}</span>
                     </div>
                     <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                      <div className="h-full bg-violet-600 rounded-full" style={{ width: plan === 'Free Tier' ? '100%' : '20%' }} />
+                      <div className="h-full bg-teal-600 rounded-full" style={{ width: plan === 'Free Tier' ? '100%' : '20%' }} />
                     </div>
                   </div>
                 </div>
@@ -1133,10 +1487,10 @@ export default function DashboardPage() {
                   <button disabled className="w-full h-10 border border-slate-200 dark:border-slate-800 rounded-full text-xs font-bold text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800/40 cursor-not-allowed">Active Plan</button>
                 </div>
 
-                <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border-2 border-violet-500 dark:border-violet-500 flex flex-col justify-between min-h-[300px] relative shadow-lg">
-                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-violet-600 text-white text-[9px] font-black uppercase tracking-wider px-3 py-1 rounded-full">Popular</span>
+                <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border-2 border-teal-500 dark:border-teal-500 flex flex-col justify-between min-h-[300px] relative shadow-lg">
+                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-teal-600 text-white text-[9px] font-black uppercase tracking-wider px-3 py-1 rounded-full">Popular</span>
                   <div>
-                    <div className="text-violet-500 font-bold uppercase tracking-wider text-[10px] mb-1">Professional</div>
+                    <div className="text-teal-500 font-bold uppercase tracking-wider text-[10px] mb-1">Professional</div>
                     <div className="text-3xl font-black mb-3">$19 <span className="text-xs text-slate-400 font-medium">/ month</span></div>
                     <ul className="space-y-2 text-xs text-slate-500 mb-6 font-medium">
                       <li>✓ Unlimited members</li>
@@ -1147,7 +1501,7 @@ export default function DashboardPage() {
                   </div>
                   <button 
                     onClick={handleMockCheckout}
-                    className="w-full h-10 bg-violet-600 text-white rounded-full text-xs font-bold hover:bg-violet-700 transition-colors"
+                    className="w-full h-10 bg-teal-600 text-white rounded-full text-xs font-bold hover:bg-teal-700 transition-colors"
                   >
                     {plan === 'Free Tier' ? 'Upgrade Plan' : 'Downgrade Plan'}
                   </button>
@@ -1179,6 +1533,84 @@ export default function DashboardPage() {
         </main>
       </div>
 
+      {/* Command Palette Modal overlay */}
+      {showCommandPalette && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh] bg-slate-950/40 backdrop-blur-sm" onClick={() => setShowCommandPalette(false)}>
+          <div 
+            className="w-full max-w-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl overflow-hidden m-4 animate-in fade-in zoom-in-95 duration-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Input field */}
+            <div className="flex items-center gap-3 px-4 border-b border-slate-100 dark:border-slate-850 h-12">
+              <Search size={18} className="text-slate-400 shrink-0" />
+              <input
+                type="text"
+                autoFocus
+                placeholder="Type a command or search tasks..."
+                value={commandQuery}
+                onChange={(e) => { setCommandQuery(e.target.value); setHighlightedIndex(0); }}
+                className="w-full h-full bg-transparent text-xs text-slate-800 dark:text-slate-100 focus:outline-none placeholder-slate-400"
+              />
+              <kbd className="h-5 px-1.5 inline-flex items-center justify-center rounded border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-[9px] text-slate-450 font-bold select-none">
+                ESC
+              </kbd>
+            </div>
+
+            {/* List items */}
+            <div className="max-h-72 overflow-y-auto p-2 space-y-1">
+              {filteredCommands.length === 0 ? (
+                <div className="text-center py-8 text-slate-400 text-xs">
+                  No matching commands or tasks found.
+                </div>
+              ) : (
+                (() => {
+                  let lastCategory = '';
+                  return filteredCommands.map((cmd, idx) => {
+                    const showCategoryHeader = cmd.category !== lastCategory;
+                    lastCategory = cmd.category;
+
+                    return (
+                      <div key={cmd.id} className="space-y-1">
+                        {showCategoryHeader && (
+                          <div className="px-3 pt-2 pb-1 text-[9px] font-black uppercase tracking-wider text-slate-400 select-none">
+                            {cmd.category}
+                          </div>
+                        )}
+                        <button
+                          onClick={() => { cmd.action(); setShowCommandPalette(false); }}
+                          className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-left transition-all ${
+                            highlightedIndex === idx 
+                              ? 'bg-teal-50 dark:bg-teal-950/20 text-teal-600 dark:text-teal-400 font-bold' 
+                              : 'text-slate-650 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900/50'
+                          }`}
+                        >
+                          <div className="space-y-0.5 truncate pr-2">
+                            <div className="text-xs truncate font-bold">{cmd.title}</div>
+                            {cmd.subtitle && (
+                              <div className="text-[10px] text-slate-450 dark:text-slate-400 font-medium truncate">{cmd.subtitle}</div>
+                            )}
+                          </div>
+                          <ChevronRight size={14} className={highlightedIndex === idx ? 'text-teal-500' : 'text-slate-400'} />
+                        </button>
+                      </div>
+                    );
+                  });
+                })()
+              )}
+            </div>
+
+            {/* Footer hints */}
+            <div className="px-4 py-2 bg-slate-50 dark:bg-slate-950 text-[9px] text-slate-400 flex items-center justify-between border-t border-slate-100 dark:border-slate-850">
+              <span className="flex items-center gap-1.5 select-none">
+                <kbd className="px-1 border rounded bg-white dark:bg-slate-900">↑↓</kbd> Navigate
+                <kbd className="px-1 border rounded bg-white dark:bg-slate-900">Enter</kbd> Select
+              </span>
+              <span className="font-bold select-none text-[8px] uppercase tracking-wide">Command Center</span>
+            </div>
+          </div>
+        </div>
+      )}
+      
       {/* Task Creation Modal (Shared across tabs) */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm">
@@ -1193,7 +1625,7 @@ export default function DashboardPage() {
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="e.g. Integrate Stripe telemetry"
-                  className="w-full h-10 px-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-xs focus:outline-none focus:ring-2 focus:ring-violet-500/10 focus:border-violet-500 transition-all"
+                  className="w-full h-10 px-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-xs focus:outline-none focus:ring-2 focus:ring-teal-500/10 focus:border-teal-500 transition-all"
                 />
               </div>
 
@@ -1205,7 +1637,7 @@ export default function DashboardPage() {
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Detailed task guidelines..."
                   rows={3}
-                  className="w-full p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-xs focus:outline-none focus:ring-2 focus:ring-violet-500/10 focus:border-violet-500 transition-all"
+                  className="w-full p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-xs focus:outline-none focus:ring-2 focus:ring-teal-500/10 focus:border-teal-500 transition-all"
                 />
               </div>
 

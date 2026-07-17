@@ -160,6 +160,34 @@ router.patch('/members/:userId/role', requireRoles('Admin'), async (req, res, ne
     next(err);
   }
 });
+// 3.5. GET TASK ACTIVITY HEATMAP DATA
+router.get('/heatmap', async (req, res, next) => {
+  try {
+    const tenantId = req.tenantId;
+    const completedTasks = await prisma.task.findMany({
+      where: {
+        tenantId,
+        status: 'Done'
+      },
+      select: {
+        createdAt: true
+      }
+    });
+
+    const counts = {};
+    completedTasks.forEach(task => {
+      const dateStr = task.createdAt.toISOString().split('T')[0];
+      counts[dateStr] = (counts[dateStr] || 0) + 1;
+    });
+
+    res.json({
+      success: true,
+      data: counts
+    });
+  } catch (err) {
+    next(err);
+  }
+});
 
 // 4. GET DASHBOARD METRICS
 router.get('/metrics', async (req, res, next) => {

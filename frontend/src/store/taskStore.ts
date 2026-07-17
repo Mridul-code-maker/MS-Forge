@@ -12,6 +12,7 @@ export interface Task {
   assigneeId: string | null;
   attachments: string;
   assignee?: { id: string; name: string; email: string };
+  createdAt?: string;
 }
 
 export interface Activity {
