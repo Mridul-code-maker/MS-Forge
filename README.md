@@ -1,6 +1,8 @@
 # 🛠️ MS-Forge — Multi-Tenant SaaS Workspace Platform
 
-Welcome to **MS-Forge**, an enterprise-grade multi-tenant SaaS platform built for real-time collaborative workspace orchestration and task tracking. Named in honor of its creator, Mridul Sharma (MS), and designed with a premium, professional Monochrome-Utility theme inspired by Linear and Cal.com.
+### 🚀 Live Demo: [https://ms-forge.vercel.app](https://ms-forge.vercel.app)
+
+Welcome to **MS-Forge**, an enterprise-grade multi-tenant SaaS platform built for real-time collaborative workspace orchestration and task tracking. Named in honor of its creator, Mridul Sharma (MS), and designed with a premium, professional Teal & Cyan theme inspired by Linear and Cal.com.
 
 ---
 
@@ -57,3 +59,16 @@ The database has been pre-populated with a sample tenant **`MS-Forge Global Work
   * **Email:** `member@msforge.com`
   * **Password:** `Mridul123!`
   * **Permissions:** Access to Kanban board (read, move, add tasks). Restricted from Admin Console.
+
+---
+
+## ⭐ Key Premium Upgrades
+
+We have recently upgraded the platform to include several premium enterprise features:
+1. **Stateful Sidebar Workspace Layout:** Smooth, cohesive left sidebar navigation structure replacing top headers.
+2. **Persistence WebSockets:** Unified dashboard state to preserve active socket links, resulting in instant cross-device updates for tasks, logs, and stats.
+3. **Task Completion Heatmap:** A visual 365-day calendar grid (similar to GitHub's contribution chart) showing daily task completions.
+4. **Command Palette (`Cmd + K`):** Global command center overlay search bar with keyboard arrow navigation to switch tabs, search tasks, toggle dark/light mode, and invite members.
+5. **Interactive SVG Charts:** Clean custom vector graphics showing monthly created/completed task trends and active status ring distributions.
+6. **CSV/PDF Export Center:** Direct download options for workspace tasks data sheets, security audit logs, and high-fidelity print reports.
+
