@@ -1130,7 +1130,7 @@ export default function DashboardPage() {
                       <li>✓ SQLite file db storage</li>
                     </ul>
                   </div>
-                  <button disabled className="w-full h-10 border border-slate-200 dark:border-slate-800 rounded-full text-xs font-bold bg-slate-50 dark:bg-slate-850 cursor-not-allowed">Active Plan</button>
+                  <button disabled className="w-full h-10 border border-slate-200 dark:border-slate-800 rounded-full text-xs font-bold text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800/40 cursor-not-allowed">Active Plan</button>
                 </div>
 
                 <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border-2 border-violet-500 dark:border-violet-500 flex flex-col justify-between min-h-[300px] relative shadow-lg">
