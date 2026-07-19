@@ -43,6 +43,7 @@ interface TaskState {
   metrics: Metrics | null;
   loading: boolean;
   socket: Socket | null;
+  socketConnected: boolean;
   
   fetchTasks: (filters?: {
     status?: string;
@@ -68,6 +69,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   metrics: null,
   loading: false,
   socket: null,
+  socketConnected: false,
 
   fetchTasks: async (filters = {}) => {
     set({ loading: true });
@@ -119,10 +121,35 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     const existingSocket = get().socket;
     if (existingSocket) return;
 
-    // Establish WebSocket connection
-    const socket = io(API_BASE);
+    // Establish WebSocket connection with retry limits and delay options
+    const socket = io(API_BASE, {
+      reconnectionDelayMax: 10000,
+      reconnectionAttempts: 10,
+      timeout: 20000
+    });
     
-    socket.emit('join_tenant', tenantId);
+    // Auto-join room on connect or auto-reconnect
+    socket.on('connect', () => {
+      console.log('WebSocket connected. Joining tenant room:', tenantId);
+      socket.emit('join_tenant', tenantId);
+      set({ socketConnected: true });
+    });
+
+    // Handle connection error
+    socket.on('connect_error', (error) => {
+      console.error('WebSocket connection error:', error);
+      set({ socketConnected: false });
+    });
+
+    // Handle disconnection
+    socket.on('disconnect', (reason) => {
+      console.warn('WebSocket disconnected. Reason:', reason);
+      set({ socketConnected: false });
+      if (reason === 'io server disconnect') {
+        // Reconnect manually if the server killed the connection
+        socket.connect();
+      }
+    });
 
     // Real-time listeners: update local state instantly
     socket.on('task_created', (newTask: Task) => {
@@ -151,7 +178,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     const { socket } = get();
     if (socket) {
       socket.disconnect();
-      set({ socket: null });
+      set({ socket: null, socketConnected: false });
     }
   },
 }));

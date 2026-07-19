@@ -46,7 +46,7 @@ export default function DashboardPage() {
   const { 
     tasks, loading: tasksLoading, fetchTasks, createTask, 
     updateTask, deleteTask, setupWebSockets, cleanupWebSockets,
-    fetchMetrics, metrics 
+    fetchMetrics, metrics, socketConnected 
   } = useTaskStore();
 
   const [activeTab, setActiveTab] = useState<'overview' | 'kanban' | 'roster' | 'logs' | 'billing'>('overview');
@@ -701,6 +701,19 @@ export default function DashboardPage() {
                 ⌘K
               </kbd>
             </button>
+            {/* Real-time WebSocket Connection Status Dot */}
+            <div 
+              className="flex items-center gap-1.5 px-2.5 h-9 rounded-lg border border-slate-200 dark:border-slate-850 text-[10px] font-bold select-none cursor-help"
+              title={socketConnected ? 'WebSocket sync channel is active and secure.' : 'WebSocket disconnected. Retrying...'}
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${
+                socketConnected ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50' : 'bg-amber-500 animate-pulse'
+              }`} />
+              <span className={socketConnected ? 'text-slate-500 dark:text-slate-400' : 'text-amber-500 font-black'}>
+                {socketConnected ? 'Sync Active' : 'Connecting'}
+              </span>
+            </div>
+
             {/* Real-time Notifications Bell */}
             <div className="relative">
               <button 

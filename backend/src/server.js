@@ -81,10 +81,19 @@ io.on('connection', (socket) => {
 
   // Client requests to join their tenant-scoped room
   socket.on('join_tenant', (tenantId) => {
-    if (tenantId) {
-      socket.join(tenantId);
-      console.log(`Socket ${socket.id} joined room (Tenant ID): ${tenantId}`);
+    try {
+      if (tenantId) {
+        socket.join(tenantId);
+        console.log(`Socket ${socket.id} joined room (Tenant ID): ${tenantId}`);
+      }
+    } catch (err) {
+      console.error(`Socket error joining tenant room: ${err.message}`);
     }
+  });
+
+  // Handle individual socket errors gracefully to prevent backend crashes
+  socket.on('error', (err) => {
+    console.error(`Socket connection error for client ${socket.id}:`, err);
   });
 
   socket.on('disconnect', () => {
